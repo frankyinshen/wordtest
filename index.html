@@ -286,7 +286,36 @@
             elements.modeSelectionControls.style.display = 'block';
             if (!state.isTTSReady) initTTS();
         }
-        async function handleUrlLoad() { const url = elements.urlInput.value.trim(); if (!url) { alert('请输入URL'); return; } setStatus('加载中...', 'url'); try { const r = await fetch(state.corsProxy + encodeURIComponent(url)); if (!r.ok) throw new Error('网络错误'); const d = await r.arrayBuffer(); parseExcel(d, 'url'); } catch (e) { console.error(e); setStatus('URL加载失败。', 'url'); } }
+        
+        // --- 核心修改部分 START ---
+        async function handleUrlLoad() { 
+            const url = elements.urlInput.value.trim(); 
+            if (!url) { alert('请输入URL'); return; } 
+            
+            // 尝试直接加载 (优先策略，解决国内访问代理慢的问题)
+            setStatus('正在尝试直接连接...', 'url'); 
+            try { 
+                const r = await fetch(url); 
+                if (!r.ok) throw new Error('Direct network error'); 
+                const d = await r.arrayBuffer(); 
+                parseExcel(d, 'url'); 
+            } catch (e1) { 
+                console.warn('直接加载失败，尝试代理:', e1);
+                // 尝试代理加载 (备用策略)
+                setStatus('直接连接失败，尝试通过代理...', 'url'); 
+                try { 
+                    const r = await fetch(state.corsProxy + encodeURIComponent(url)); 
+                    if (!r.ok) throw new Error('Proxy network error'); 
+                    const d = await r.arrayBuffer(); 
+                    parseExcel(d, 'url'); 
+                } catch (e2) { 
+                    console.error(e2); 
+                    setStatus('加载失败: 请检查网址是否正确，或者服务器是否允许跨域(CORS)。', 'url'); 
+                } 
+            } 
+        }
+        // --- 核心修改部分 END ---
+
         function handleFileUpload(e) { const f = e.target.files[0]; if (f) { setStatus(f.name, 'local'); const r = new FileReader(); r.onload = (ev) => parseExcel(ev.target.result, 'local'); r.readAsArrayBuffer(f); } }
         
         function highlightWordInSentence(sentence, word) { if (!sentence || !word) return sentence; const regex = new RegExp(`\\b(${word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})\\b`, 'gi'); return sentence.replace(regex, '<span class="highlight">$1</span>'); }
