@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>单词学习与测试程序</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4a90e2; --primary-hover: #357abd;
+            --secondary-color: #f5f7fa; --font-color: #333;
+            --border-color: #dcdfe6; --light-gray: #f8f9fa; --gray: #6c757d;
+            --green: #28a745; --green-hover: #218838;
+            --red: #dc3545; --red-hover: #c82333;
+            --orange: #fd7e14; --orange-hover: #e37012;
+            --purple: #6f42c1; --purple-hover: #5a359a;
+        }
+        body, html {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--secondary-color); color: var(--font-color);
+            height: 100%;
+        }
+        .app-container {
+            display: flex; flex-direction: column; height: 100vh;
+            max-width: 1000px; margin: 0 auto;
+            background-color: white; box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+        .view {
+            display: none; flex-direction: column; align-items: center;
+            height: 100%; padding: 20px 25px;
+            box-sizing: border-box; 
+            overflow-y: auto;
+        }
+        .view.active { display: flex; }
+        .main-content {
+            flex-grow: 1; width: 100%;
+            padding-bottom: 120px;
+        }
+        #setup-view { justify-content: flex-start; }
+        #setup-view h1 { color: var(--primary-color); text-align: center; margin-top: 0; margin-bottom: 12px; }
+        .setup-section { width: 100%; max-width: 500px; margin-bottom: 12px; }
+        .input-group { margin-bottom: 10px; }
+        .input-group label { display: block; margin-bottom: 4px; color: var(--gray); font-size: 14px; }
+        .input-field {
+            width: 100%; padding: 12px; border: 1px solid var(--border-color);
+            border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: all 0.2s ease;
+        }
+        .input-field:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+            outline: none;
+        }
+        .tab-nav { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 12px; }
+        .tab-btn {
+            padding: 8px 15px;
+            border: none; background-color: transparent; font-size: 16px;
+            cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; font-weight: 500;
+        }
+        .tab-btn.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        #file-input { display: none; }
+        #template-link { display: inline-block; margin-top: 8px; color: var(--primary-color); font-weight: 500; font-size: 14px; }
+        
+        .loader-container { display: flex; align-items: center; gap: 10px; margin-top: 10px;}
+        .loading-status-inline { color: var(--gray); font-size: 14px; flex-grow: 1; text-align: left; }
+
+        #mode-selection-controls, #voice-settings { display: none; }
+        #mode-selection-controls h3, #voice-settings p { margin-top: 5px; margin-bottom: 8px; text-align: center; }
+        #tts-status { font-size: 13px; color: var(--gray); text-align: center; margin-top: 4px; min-height: 18px; }
+
+        .delay-setting-group { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 15px; }
+        .delay-setting-group label { margin: 0; color: var(--gray); font-size: 14px; white-space: nowrap; }
+        #delay-input { width: 70px; text-align: center; padding: 8px; }
+        
+        .button-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 12px; }
+        .btn {
+            padding: 12px 18px;
+            font-size: 16px; font-weight: 600;
+            border-radius: 8px; cursor: pointer; border: none;
+            color: white; letter-spacing: 0.5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.15s ease;
+            background-color: var(--primary-color);
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 7px 14px rgba(0,0,0,0.1); }
+        .btn:active { transform: translateY(1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .btn-outline {
+            background-color: transparent; border: 2px solid var(--border-color);
+            color: var(--gray); box-shadow: none;
+        }
+        .btn-outline:hover { background-color: var(--light-gray); border-color: var(--gray); transform: none; box-shadow: none; }
+        
+        .btn-green { background-color: var(--green); } .btn-green:hover { background-color: var(--green-hover); }
+        .btn-red { background-color: var(--red); } .btn-red:hover { background-color: var(--red-hover); }
+        .btn-orange { background-color: var(--orange); } .btn-orange:hover { background-color: var(--orange-hover); }
+        .btn-purple { background-color: var(--purple); } .btn-purple:hover { background-color: var(--purple-hover); }
+
+        #study-view .main-content { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; text-align: center; padding-top: 5vh; }
+        #progress-indicator { font-size: 18px; color: var(--gray); font-weight: bold; margin-bottom: 20px; }
+        .word-display { cursor: pointer; }
+        .word-display .english { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
+        .word-display .phonetic { font-size: 24px; color: var(--gray); }
+        
+        .info-panel { margin-top: 20px; width: 90%; }
+        .info-item { background-color: var(--light-gray); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-top: 10px; text-align: left; display: none; }
+        .info-item.visible { display: block; }
+        .highlight { color: var(--red); font-weight: bold; }
+
+        .toggle-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 25px 0; max-width: 600px; width: 100%;}
+        .toggle-btn { padding: 8px 16px; font-size: 14px; border-color: var(--primary-color); color: var(--primary-color); text-transform: none; }
+        .toggle-btn:hover { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
+
+        .study-actions-desktop { display: none; }
+        .bottom-bar { display: none; }
+        
+        .action-buttons-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+        .action-buttons-grid .btn { width: 100%; box-sizing: border-box; padding: 12px 10px; }
+        .btn-full-width { width: 100%; }
+        .nav-buttons { display: flex; justify-content: space-between; gap: 10px; }
+        .nav-buttons .btn { flex-grow: 1; }
+        
+        #results-view .main-content { justify-content: flex-start; align-items: stretch; }
+        .results-summary { font-size: 20px; margin-bottom: 20px; text-align: center; }
+        .error-category { width: 100%; max-width: 800px; margin-bottom: 25px; margin-left: auto; margin-right: auto; }
+        .error-category h3 { 
+            border-bottom: 2px solid var(--primary-color); padding-bottom: 8px; display: flex; 
+            justify-content: space-between; align-items: center; 
+        }
+        .error-list { list-style-type: none; padding: 0; }
+        .error-card {
+            background-color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: left;
+        }
+        .error-card .word-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+        .error-card .word-english { font-size: 20px; font-weight: bold; color: var(--primary-color); }
+        .error-card .word-phonetic { font-size: 16px; color: var(--gray); }
+        .error-card .word-info { font-size: 14px; color: #555; line-height: 1.6; }
+        .error-card .word-info p { margin: 4px 0; }
+        .error-card .word-info strong { color: #333; }
+        
+        @media (min-width: 768px) { .study-actions-desktop { display: block; width: 100%; max-width: 600px; margin-top: 20px; } }
+        @media (max-width: 767px) {
+            .app-container { box-shadow: none; }
+            .view { padding: 15px 15px 20px 15px; }
+            #setup-view h1 { font-size: 22px; margin-bottom: 10px; }
+            .word-display .english { font-size: 36px; }
+            .word-display .phonetic { font-size: 20px; }
+            #progress-indicator { font-size: 16px; }
+            .toggle-buttons { grid-template-columns: repeat(2, 1fr); display: grid; }
+            #toggle-all-btn { grid-column: 1 / -1; }
+            .bottom-bar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background-color: #ffffff; padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); flex-direction: column; gap: 10px; max-width: 1000px; margin: 0 auto; border-top: 1px solid var(--border-color); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- HTML structure is populated by JS -->
+    </div>
+
+    <script>
+        document.querySelector('.app-container').innerHTML = `
+        <div id="setup-view" class="view active"><h1>单词学习与测试程序</h1><div class="setup-section"><div class="input-group"><label for="name-input">请输入你的名字</label><input type="text" id="name-input" class="input-field" placeholder="例如：EVAN"></div></div><div class="setup-section"><div class="tab-nav"><button class="tab-btn active" data-tab="url">从URL加载</button><button class="tab-btn" data-tab="local">上传本地文件</button></div><div id="url-tab" class="tab-content active"><input type="text" id="url-input" class="input-field" placeholder="粘贴 Excel 文件链接"><div class="loader-container"><button id="load-url-btn" class="btn">加载数据</button><button id="review-btn" class="btn btn-red">开始复习</button><p id="loading-status-url" class="loading-status-inline"></p></div></div><div id="local-tab" class="tab-content"><div class="loader-container"><button id="upload-btn" class="btn">选择文件</button><p id="loading-status-local" class="loading-status-inline"></p></div><input type="file" id="file-input" accept=".xls,.xlsx"></div><div id="sheet-selector" style="display:none; margin-top:15px;"><label for="sheet-select">检测到多个工作表，请选择:</label><select id="sheet-select" class="input-field"></select></div><a id="template-link" href="#" download="单词学习模板.xlsx">下载Excel模板</a></div>
+        <div id="voice-settings" class="setup-section"><p>语音引擎设置</p><select id="voice-select" class="input-field"></select><p id="tts-status"></p></div>
+        <div id="mode-selection-controls" class="setup-section"><h3 id="welcome-message" style="text-align: center;"></h3><div class="button-group"><button class="btn mode-btn" data-mode="test">测试模式</button><button class="btn mode-btn" data-mode="phonics">自然拼读</button><button class="btn mode-btn" data-mode="beginner">初学者</button></div><div id="delay-settings" style="display:none;"><div class="delay-setting-group"><label for="delay-input">延时自动播放 (秒, 0为手动)</label><input type="number" id="delay-input" class="input-field" step="0.1" min="0"></div></div><div class="button-group"><button id="start-btn" class="btn btn-green">开始学习</button></div></div></div>
+        <div id="review-options-view" class="view"><h2>选择复习范围</h2><div class="button-group" style="flex-direction: column;"><button class="btn review-range-btn" data-days="0">复习今天</button><button class="btn review-range-btn" data-days="3">复习近3天</button><button class="btn review-range-btn" data-days="7">复习近7天</button><button class="btn review-range-btn" data-days="all">复习全部</button><button id="back-to-setup-from-review" class="btn btn-outline">返回</button></div></div>
+        <div id="study-view" class="view"><div class="main-content"><div id="progress-indicator"></div><div class="word-display" id="word-display-area"><div class="english" id="word-english"></div><div class="phonetic" id="word-phonetic"></div></div><div class="toggle-buttons" id="toggle-buttons-panel"><button class="toggle-btn btn btn-outline" data-target="info-chinese">中文</button><button class="toggle-btn btn btn-outline" data-target="info-sentence">原句</button><button class="toggle-btn btn btn-outline" data-target="info-translation">翻译</button><button class="toggle-btn btn btn-outline" data-target="info-notes">备注</button><button id="toggle-all-btn" class="toggle-btn btn btn-outline">全部显示</button></div><div class="info-panel"><div id="info-chinese" class="info-item"><b>中文意思:</b> <span id="word-chinese-content"></span></div><div id="info-sentence" class="info-item"><b>绘本原句:</b> <span id="word-sentence-content"></span></div><div id="info-translation" class="info-item"><b>句子翻译:</b> <span id="word-translation-content"></span></div><div id="info-notes" class="info-item"><b>备注:</b> <span id="word-notes-content"></span></div></div><div class="study-actions-desktop"><div id="desktop-actions-placeholder"></div><div class="nav-buttons" style="margin-top: 10px;"><button id="prev-word-btn-desktop" class="btn btn-outline">上一个</button><button id="exit-session-btn-desktop" class="btn btn-outline">退出</button></div></div></div><div class="bottom-bar"><div id="mobile-actions-placeholder"></div><div class="nav-buttons"><button id="prev-word-btn-mobile" class="btn btn-outline">上一个</button><button id="exit-session-btn-mobile" class="btn btn-outline">退出</button></div></div></div>
+        <div id="results-view" class="view"><div class="main-content"><h2 id="results-title">太棒了!</h2><p id="results-summary" class="results-summary"></p><div id="error-container"></div><div class="button-group"><button id="export-errors-btn" class="btn">导出错题</button><button id="return-home-from-results-btn" class="btn btn-outline">返回首页</button></div></div></div>
+        <template id="actions-template"></template>`;
+        
+        document.getElementById('actions-template').innerHTML = `<div id="test-mode-buttons" class="action-buttons-grid" style="display: none;"><button class="btn btn-green" data-result="correct">✓ 全对</button><button class="btn btn-red" data-result="all_wrong">✗ 全错</button><button class="btn btn-orange" data-result="meaning_wrong">✓ 读音 | ✗ 意思</button><button class="btn btn-purple" data-result="pron_wrong">✗ 读音 | ✓ 意思</button></div><div id="phonics-mode-buttons" class="action-buttons-grid" style="display: none;"><button class="btn btn-green" data-result="phonics_correct">我读对了</button><button class="btn btn-red" data-result="phonics_wrong">我读错了</button></div><div id="beginner-mode-buttons" class="action-buttons-grid" style="display: none;"><button class="btn beginner-next-btn btn-full-width">下一个</button></div>`;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const state = { userName: '', workbook: null, allWords: [], studyList: [], mainSessionErrors: [], currentWordIndex: 0, currentMode: null, sessionSubErrors: [], isCategorizedReview: false, delaySettings: { test: 1.5, phonics: 1.5 }, ttsVoice: null, isTTSReady: false, allVoices: [], autoPlayTimeout: null, corsProxy: 'https://api.allorigins.win/raw?url=' };
+        const views = { setup: document.getElementById('setup-view'), reviewOptions: document.getElementById('review-options-view'), study: document.getElementById('study-view'), results: document.getElementById('results-view'), };
+        const elements = { nameInput: document.getElementById('name-input'), urlInput: document.getElementById('url-input'), fileInput: document.getElementById('file-input'), loadUrlBtn: document.getElementById('load-url-btn'), uploadBtn: document.getElementById('upload-btn'), sheetSelector: document.getElementById('sheet-selector'), sheetSelect: document.getElementById('sheet-select'), loadingStatusUrl: document.getElementById('loading-status-url'), loadingStatusLocal: document.getElementById('loading-status-local'), voiceSettings: document.getElementById('voice-settings'), voiceSelect: document.getElementById('voice-select'), ttsStatus: document.getElementById('tts-status'), templateLink: document.getElementById('template-link'), modeSelectionControls: document.getElementById('mode-selection-controls'), welcomeMessage: document.getElementById('welcome-message'), startBtn: document.getElementById('start-btn'), reviewBtn: document.getElementById('review-btn'), delaySettings: document.getElementById('delay-settings'), delayInput: document.getElementById('delay-input'), progressIndicator: document.getElementById('progress-indicator'), wordEnglish: document.getElementById('word-english'), wordPhonetic: document.getElementById('word-phonetic'), wordChinese: document.getElementById('word-chinese-content'), wordSentence: document.getElementById('word-sentence-content'), wordTranslation: document.getElementById('word-translation-content'), wordNotes: document.getElementById('word-notes-content'), infoItems: document.querySelectorAll('.info-item'), toggleButtonsPanel: document.getElementById('toggle-buttons-panel'), wordDisplayArea: document.getElementById('word-display-area'), resultsTitle: document.getElementById('results-title'), resultsSummary: document.getElementById('results-summary'), errorContainer: document.getElementById('error-container'), exportErrorsBtn: document.getElementById('export-errors-btn'), desktopActionsPlaceholder: document.getElementById('desktop-actions-placeholder'), mobileActionsPlaceholder: document.getElementById('mobile-actions-placeholder'), actionsTemplate: document.getElementById('actions-template'), };
+        
+        function switchView(viewName) { Object.values(views).forEach(v => v.classList.remove('active')); views[viewName].classList.add('active'); }
+        function saveData() { localStorage.setItem('wordLearner_userName', state.userName); localStorage.setItem('wordLearner_delaySettings', JSON.stringify(state.delaySettings)); localStorage.setItem('wordLearner_voiceURI', state.ttsVoice ? state.ttsVoice.voiceURI : ''); }
+        function loadData() { state.userName = localStorage.getItem('wordLearner_userName') || ''; elements.nameInput.value = state.userName; const s = localStorage.getItem('wordLearner_delaySettings'); if (s) state.delaySettings = JSON.parse(s); }
+        
+        function initTTS() {
+            if (!('speechSynthesis' in window)) { elements.ttsStatus.textContent = '语音功能不受支持'; return; }
+            elements.ttsStatus.textContent = '语音引擎加载中...';
+            let pollInterval;
+            
+            const populateVoiceList = () => {
+                const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+                if (voices.length === 0) return false;
+                
+                state.allVoices = voices;
+                elements.voiceSelect.innerHTML = '';
+                voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    option.value = voice.voiceURI;
+                    elements.voiceSelect.appendChild(option);
+                });
+
+                const savedURI = localStorage.getItem('wordLearner_voiceURI');
+                let selectedVoice = voices.find(v => v.voiceURI === savedURI);
+
+                if (!selectedVoice) {
+                    const findVoice = (keywords) => voices.find(v => keywords.some(k => v.name.toLowerCase().includes(k.toLowerCase())));
+                    const priorities = [
+                        () => voices.find(v => v.default),
+                        () => findVoice(['enhanced', 'premium', '优化', '优质']),
+                        () => findVoice(['natural', 'ava']),
+                        () => findVoice(['microsoft', 'online']),
+                        () => findVoice(['google']),
+                        () => voices.find(v => v.lang.startsWith('en-US') && v.localService),
+                    ];
+                    for (const getVoice of priorities) {
+                        selectedVoice = getVoice();
+                        if (selectedVoice) break;
+                    }
+                    if (!selectedVoice) selectedVoice = voices[0];
+                }
+                
+                state.ttsVoice = selectedVoice;
+                elements.voiceSelect.value = selectedVoice.voiceURI;
+                state.isTTSReady = true;
+                elements.ttsStatus.textContent = `当前语音: ${state.ttsVoice.name}`;
+                elements.voiceSettings.style.display = 'block';
+                return true;
+            };
+
+            speechSynthesis.speak(new SpeechSynthesisUtterance(' '));
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = populateVoiceList;
+            }
+            if (!populateVoiceList()) {
+                let elapsed = 0;
+                pollInterval = setInterval(() => {
+                    elapsed += 500;
+                    if (populateVoiceList() || elapsed >= 5000) {
+                        clearInterval(pollInterval);
+                        if (!state.isTTSReady) {
+                            elements.ttsStatus.textContent = '语音引擎加载失败';
+                        }
+                    }
+                }, 500);
+            }
+        }
+
+        elements.voiceSelect.addEventListener('change', (e) => {
+            const selectedURI = e.target.value;
+            state.ttsVoice = state.allVoices.find(v => v.voiceURI === selectedURI);
+            elements.ttsStatus.textContent = `当前语音: ${state.ttsVoice.name}`;
+            saveData();
+            speak("Hello");
+        });
+        
+        function activateMobileAudio() { if (speechSynthesis.speaking) return; const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); }
+        function speak(text) { if (!text) return; if (!state.isTTSReady || !state.ttsVoice) { console.error("TTS未就绪, 无法发音。"); return; } speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = state.ttsVoice; u.rate = 1.0; u.pitch = 1.0; speechSynthesis.speak(u); }
+        
+        function setStatus(message, type = 'url') {
+            const target = type === 'url' ? elements.loadingStatusUrl : elements.loadingStatusLocal;
+            target.textContent = message;
+        }
+
+        function parseExcel(data, type) {
+            try {
+                setStatus('正在解析...', type);
+                state.workbook = XLSX.read(data, { type: 'array' });
+                elements.sheetSelect.innerHTML = '';
+                state.workbook.SheetNames.forEach(name => { const o = document.createElement('option'); o.value = o.textContent = name; elements.sheetSelect.appendChild(o); });
+                elements.sheetSelector.style.display = state.workbook.SheetNames.length > 1 ? 'block' : 'none';
+                processSheet(state.workbook.SheetNames[0], type);
+            } catch (e) { console.error(e); setStatus('文件解析失败。', type); elements.modeSelectionControls.style.display = 'none'; }
+        }
+        function processSheet(sheetName, type) {
+            const worksheet = state.workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 2 });
+            state.allWords = jsonData.filter(row => row[1] && row[1].trim() !== '').map(row => ({ id: row[0], english: row[1]?.trim() || '', phonetic: row[2] || '', chinese: row[3] || '', sentence: row[4] || '', translation: row[5] || '', notes: row[6] || '' }));
+            setStatus(`加载成功!`, type);
+            elements.welcomeMessage.textContent = `${state.userName || '你好'}，共加载了 ${state.allWords.length} 个单词。`;
+            elements.modeSelectionControls.style.display = 'block';
+            if (!state.isTTSReady) initTTS();
+        }
+        async function handleUrlLoad() { const url = elements.urlInput.value.trim(); if (!url) { alert('请输入URL'); return; } setStatus('加载中...', 'url'); try { const r = await fetch(state.corsProxy + encodeURIComponent(url)); if (!r.ok) throw new Error('网络错误'); const d = await r.arrayBuffer(); parseExcel(d, 'url'); } catch (e) { console.error(e); setStatus('URL加载失败。', 'url'); } }
+        function handleFileUpload(e) { const f = e.target.files[0]; if (f) { setStatus(f.name, 'local'); const r = new FileReader(); r.onload = (ev) => parseExcel(ev.target.result, 'local'); r.readAsArrayBuffer(f); } }
+        
+        function highlightWordInSentence(sentence, word) { if (!sentence || !word) return sentence; const regex = new RegExp(`\\b(${word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})\\b`, 'gi'); return sentence.replace(regex, '<span class="highlight">$1</span>'); }
+        function displayWord() {
+            if (state.autoPlayTimeout) clearTimeout(state.autoPlayTimeout);
+            if (state.currentWordIndex >= state.studyList.length) { endSession(); return; }
+            const word = state.studyList[state.currentWordIndex];
+            elements.progressIndicator.textContent = `进度: ${state.currentWordIndex + 1} / ${state.studyList.length}`;
+            elements.wordEnglish.textContent = word.english; elements.wordPhonetic.textContent = word.phonetic; elements.wordChinese.textContent = word.chinese; elements.wordSentence.innerHTML = highlightWordInSentence(word.sentence, word.english); elements.wordTranslation.textContent = word.translation; elements.wordNotes.textContent = word.notes;
+            elements.infoItems.forEach(item => item.classList.remove('visible'));
+            document.getElementById('toggle-all-btn').textContent = '全部显示';
+            const delay = Number(elements.delayInput.value);
+            if (state.currentMode === 'beginner') {
+                document.getElementById('info-chinese').classList.add('visible');
+                document.getElementById('info-sentence').classList.add('visible');
+                speak(word.english); 
+            } else if (delay > 0) { 
+                state.autoPlayTimeout = setTimeout(() => speak(word.english), delay * 1000); 
+            }
+        }
+        function startSession(wordList, mode, isCategorizedReview = false) {
+            state.studyList = wordList; state.currentMode = mode; state.currentWordIndex = 0; state.sessionSubErrors = [];
+            state.isCategorizedReview = isCategorizedReview;
+            if (!isCategorizedReview) { state.mainSessionErrors = []; }
+            if (state.studyList.length === 0) { alert("没有要学习的单词。"); return; }
+            const clone = elements.actionsTemplate.content.cloneNode(true);
+            elements.desktopActionsPlaceholder.innerHTML = ''; elements.mobileActionsPlaceholder.innerHTML = '';
+            elements.desktopActionsPlaceholder.appendChild(clone);
+            elements.mobileActionsPlaceholder.appendChild(elements.actionsTemplate.content.cloneNode(true));
+            [elements.desktopActionsPlaceholder, elements.mobileActionsPlaceholder].forEach(container => {
+                 container.querySelector('#test-mode-buttons').style.display = mode === 'test' ? 'grid' : 'none';
+                 container.querySelector('#phonics-mode-buttons').style.display = mode === 'phonics' ? 'grid' : 'none';
+                 container.querySelector('#beginner-mode-buttons').style.display = mode === 'beginner' ? 'grid' : 'none';
+            });
+            elements.toggleButtonsPanel.style.display = 'flex';
+            document.querySelectorAll('[id^="prev-word-btn"]').forEach(btn => btn.disabled = false);
+            switchView('study');
+            displayWord();
+        }
+        function endSession() {
+            if (state.isCategorizedReview) {
+                const correctInSubSession = state.studyList.filter(w => !state.sessionSubErrors.some(e => e.english === w.english));
+                state.mainSessionErrors = state.mainSessionErrors.filter(err => !correctInSubSession.some(c => c.english === err.english));
+                displayResults(state.mainSessionErrors);
+                switchView('results');
+            } else {
+                state.mainSessionErrors = [...state.sessionSubErrors];
+                saveErrorsToHistory(state.mainSessionErrors);
+                displayResults(state.mainSessionErrors);
+                switchView('results');
+            }
+        }
+        function nextWord() { if (state.currentWordIndex < state.studyList.length - 1) { state.currentWordIndex++; displayWord(); } else { endSession(); } }
+        function prevWord() { if (state.currentWordIndex > 0) { state.currentWordIndex--; displayWord(); } }
+        function recordError(errorType) { const word = state.studyList[state.currentWordIndex]; if (!state.sessionSubErrors.find(e => e.english === word.english)) { state.sessionSubErrors.push({ ...word, errorType }); } }
+        function saveErrorsToHistory(errors) { if (errors.length === 0) return; let history = JSON.parse(localStorage.getItem('wordLearner_errorHistory') || '[]'); const newErrors = errors.map(err => ({ ...err, date: new Date().toISOString() })); history = history.concat(newErrors); localStorage.setItem('wordLearner_errorHistory', JSON.stringify(history)); }
+        function getErrorsFromHistory(days) { let history = JSON.parse(localStorage.getItem('wordLearner_errorHistory') || '[]'); if (history.length === 0) return []; const now = new Date(); const uniqueWords = new Map(); if (days !== 'all') { const cutoff = new Date(); if (days === 0) { cutoff.setHours(0, 0, 0, 0); } else { cutoff.setDate(now.getDate() - days); } history = history.filter(err => new Date(err.date) >= cutoff); } history.forEach(word => { uniqueWords.set(word.english, word); }); return Array.from(uniqueWords.values()); }
+        
+        function displayResults(errors) {
+            const total = state.studyList.length;
+            const correctCount = total - errors.length;
+            const accuracy = total > 0 ? (correctCount / total) * 100 : 100;
+
+            let encouragement = '';
+            if (state.isCategorizedReview) {
+                 encouragement = `太棒了, ${state.userName || '同学'}!`;
+            } else if (accuracy === 100) {
+                encouragement = `太完美了, ${state.userName || '同学'}! 百分百正确，你真是个天才！`;
+            } else if (accuracy >= 90) {
+                encouragement = `非常棒, ${state.userName || '同学'}! 成绩优秀，离完美只有一步之遥！`;
+            } else if (accuracy >= 75) {
+                encouragement = `做得不错, ${state.userName || '同学'}! 继续努力，错题是你进步的阶梯。`;
+            } else {
+                encouragement = `加油, ${state.userName || '同学'}! 别灰心，复习一下错题，下次会更好！`;
+            }
+            elements.resultsTitle.textContent = encouragement;
+            
+            if (errors.length === 0) {
+                elements.resultsSummary.innerHTML = '本次学习所有单词均已掌握！';
+                elements.errorContainer.innerHTML = '';
+                elements.exportErrorsBtn.style.display = 'none';
+            } else {
+                elements.resultsSummary.textContent = state.isCategorizedReview ? `还剩下 ${errors.length} 个错题需要复习。` : `本次答对 ${correctCount} 个，答错 ${errors.length} 个，正确率 ${accuracy.toFixed(1)}%`;
+                elements.exportErrorsBtn.style.display = 'inline-block';
+                const errorsByType = { pron_wrong: { title: '读音错误', words: [] }, meaning_wrong: { title: '意思错误', words: [] }, all_wrong: { title: '读音、意思均错', words: [] }, phonics_wrong: { title: '拼读错误', words: [] } };
+                errors.forEach(err => { if (errorsByType[err.errorType]) errorsByType[err.errorType].words.push(err); });
+                let html = '';
+                for (const type in errorsByType) {
+                    const group = errorsByType[type];
+                    if (group.words.length > 0) { 
+                        html += `<div class="error-category"><h3><span>${group.title} (${group.words.length}个)</span><button class="btn review-error-group-btn" data-error-type="${type}">复习此类</button></h3><ul class="error-list">${group.words.map(w => `<li class="error-card"><div class="word-header"><span class="word-english">${w.english}</span><span class="word-phonetic">${w.phonetic || ''}</span></div><div class="word-info"><p><strong>中文:</strong> ${w.chinese || 'N/A'}</p><p><strong>例句:</strong> ${highlightWordInSentence(w.sentence, w.english) || 'N/A'}</p></div></li>`).join('')}</ul></div>`;
+                    }
+                }
+                elements.errorContainer.innerHTML = html;
+            }
+        }
+        
+        function getFormattedTimestamp() {
+            const d = new Date();
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+        }
+        function exportErrorsToExcel() { 
+            const errors = state.mainSessionErrors; if (errors.length === 0) return; 
+            const name = (state.userName || 'User').replace(/[^a-zA-Z0-9]/g, '');
+            const map = { pron_wrong: '读音错误', meaning_wrong: '意思错误', all_wrong: '读音、意思均错', phonics_wrong: '拼读错误' }; 
+            const data = errors.map(w => ([ w.id, w.english, w.phonetic, w.chinese, w.sentence, w.translation, w.notes, map[w.errorType] || '未知'])); 
+            const finalData = [ [], ['序号', '英文', '音标', '中文', '例句', '例句翻译', '备注', '错误类型'], ...data ]; 
+            const ws = XLSX.utils.aoa_to_sheet(finalData); const wb = XLSX.utils.book_new(); 
+            XLSX.utils.book_append_sheet(wb, ws, "Errors"); 
+            const filename = `${name || 'User'}Errors${getFormattedTimestamp()}.xlsx`;
+            XLSX.writeFile(wb, filename); 
+        }
+        function createAndDownloadTemplate() {
+            const templateData = [
+                ['说明:', '...'],
+                ['序号', '英文', '音标', '中文', '例句', '例句翻译', '备注'],
+                [1, 'apple', '/ˈæp.əl/', '苹果', 'An apple a day keeps the doctor away.', '一天一苹果...','...'],
+                [2, 'banana', '/bəˈnɑː.nə/', '香蕉', 'Monkeys love to eat bananas.', '猴子喜欢吃香蕉。', ''],
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(templateData); const wb = XLSX.utils.book_new(); 
+            XLSX.utils.book_append_sheet(wb, ws, "单词列表"); 
+            const o = XLSX.write(wb, { bookType:'xlsx', type:'array' }); 
+            const b = new Blob([o], {type:"application/octet-stream"}); 
+            elements.templateLink.href = URL.createObjectURL(b); 
+        }
+        
+        // --- Event Listeners ---
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', (e) => { document.querySelector('.tab-btn.active').classList.remove('active'); document.querySelector('.tab-content.active').classList.remove('active'); e.currentTarget.classList.add('active'); document.getElementById(e.currentTarget.dataset.tab + '-tab').classList.add('active'); }));
+        elements.nameInput.addEventListener('change', (e) => { state.userName = e.target.value; saveData(); });
+        elements.loadUrlBtn.addEventListener('click', handleUrlLoad); 
+        elements.uploadBtn.addEventListener('click', () => elements.fileInput.click()); 
+        elements.fileInput.addEventListener('change', handleFileUpload); 
+        elements.sheetSelect.addEventListener('change', (e) => processSheet(e.target.value, document.querySelector('.tab-btn.active').dataset.tab));
+        
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            const mode = e.target.dataset.mode;
+            state.currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.style.backgroundColor = '');
+            e.target.style.backgroundColor = 'var(--primary-hover)';
+            
+            if (mode === 'beginner') {
+                activateMobileAudio();
+                startSession(state.allWords, 'beginner', false);
+            } else {
+                elements.delaySettings.style.display = 'block';
+                elements.delayInput.value = state.delaySettings[mode];
+            }
+        }));
+
+        elements.delayInput.addEventListener('change', (e) => { if (['test', 'phonics'].includes(state.currentMode)) { state.delaySettings[state.currentMode] = parseFloat(e.target.value); saveData(); } });
+        elements.startBtn.addEventListener('click', () => { if (!state.currentMode) { alert('请先选择一个模式'); return; } activateMobileAudio(); startSession(state.allWords, state.currentMode, false); });
+        
+        views.study.addEventListener('click', (e) => {
+            const target = e.target.closest('button'); 
+            if (!target) return;
+            if (target.id === 'toggle-all-btn') {
+                const infoItems = document.querySelectorAll('#study-view .info-item');
+                const isAnyHidden = Array.from(infoItems).some(item => !item.classList.contains('visible'));
+                infoItems.forEach(item => {
+                    isAnyHidden ? item.classList.add('visible') : item.classList.remove('visible');
+                });
+                target.textContent = isAnyHidden ? '全部重置' : '全部显示';
+                return;
+            }
+            const result = target.dataset.result;
+            if (result) { if (result.startsWith('phonics')) { if (result === 'phonics_wrong') { recordError(result); speak(state.studyList[state.currentWordIndex]?.english); } else { nextWord(); } } else { if (result !== 'correct') recordError(result); nextWord(); } } 
+            else if (target.classList.contains('beginner-next-btn')) { nextWord(); } 
+            else if (target.matches('[id^="prev-word-btn"]')) { prevWord(); } 
+            else if (target.matches('[id^="exit-session-btn"]')) { endSession(); } 
+            else if (target.classList.contains('toggle-btn')) { document.getElementById(target.dataset.target).classList.toggle('visible'); }
+        });
+
+        elements.wordDisplayArea.addEventListener('click', () => { speak(state.studyList[state.currentWordIndex]?.english); });
+        elements.errorContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('review-error-group-btn')) {
+                const errorType = e.target.dataset.errorType;
+                const wordsToReview = state.mainSessionErrors.filter(err => err.errorType === errorType);
+                const reviewMode = errorType === 'phonics_wrong' ? 'phonics' : 'test';
+                startSession(wordsToReview, reviewMode, true);
+            }
+        });
+        elements.exportErrorsBtn.addEventListener('click', exportErrorsToExcel);
+        document.getElementById('return-home-from-results-btn').addEventListener('click', () => {
+            elements.modeSelectionControls.style.display = 'none'; 
+            if (state.allWords && state.allWords.length > 0) {
+                 elements.welcomeMessage.textContent = `${state.userName || '你好'}，共加载了 ${state.allWords.length} 个单词。`;
+                 elements.modeSelectionControls.style.display = 'block';
+            }
+            switchView('setup');
+        });
+        elements.reviewBtn.addEventListener('click', () => { const history = getErrorsFromHistory('all'); if (history.length === 0) { alert('太棒了，目前没有错题记录！'); } else { switchView('reviewOptions'); } });
+        document.querySelectorAll('.review-range-btn').forEach(btn => btn.addEventListener('click', (e) => { const days = e.target.dataset.days === 'all' ? 'all' : Number(e.target.dataset.days); const reviewList = getErrorsFromHistory(days); if (reviewList.length === 0) { alert(`所选范围内没有错题记录。`); return; } state.allWords = reviewList; elements.welcomeMessage.textContent = `${state.userName || '你好'}，共加载了 ${state.allWords.length} 个错题进行复习。`; elements.modeSelectionControls.style.display = 'block'; switchView('setup'); document.querySelector('.mode-btn[data-mode="test"]').click(); }));
+        document.getElementById('back-to-setup-from-review').addEventListener('click', () => switchView('setup'));
+        
+        function init() { loadData(); createAndDownloadTemplate(); initTTS(); switchView('setup'); }
+        init();
+    });
+    </script>
+</body>
+</html>
