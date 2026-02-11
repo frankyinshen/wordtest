@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>单词学习与测试程序</title>
+    <title>单词学习与测试程序2.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -101,10 +101,35 @@
 
         #study-view .main-content { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; text-align: center; padding-top: 5vh; }
         #progress-indicator { font-size: 18px; color: var(--gray); font-weight: bold; margin-bottom: 20px; }
-        .word-display { cursor: pointer; }
+        .word-display { cursor: pointer; position: relative; user-select: none; -webkit-user-select: none; }
+        .word-display:active { opacity: 0.7; }
         .word-display .english { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
         .word-display .phonetic { font-size: 24px; color: var(--gray); }
         
+        /* Toast Notification */
+        .toast {
+            visibility: hidden;
+            min-width: 150px;
+            background-color: rgba(50, 50, 50, 0.9);
+            color: #fff;
+            text-align: center;
+            border-radius: 25px;
+            padding: 12px;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            top: 40%;
+            transform: translate(-50%, -50%);
+            font-size: 15px;
+            opacity: 0;
+            transition: opacity 0.3s, top 0.3s;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+            top: 45%;
+        }
+
         .info-panel { margin-top: 20px; width: 90%; }
         .info-item { background-color: var(--light-gray); border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-top: 10px; text-align: left; display: none; }
         .info-item.visible { display: block; }
@@ -165,14 +190,16 @@
     <div class="app-container">
         <!-- HTML structure is populated by JS -->
     </div>
+    <!-- Toast Notification Container -->
+    <div id="toast-notification" class="toast">已复制</div>
 
     <script>
         document.querySelector('.app-container').innerHTML = `
-        <div id="setup-view" class="view active"><h1>单词学习与测试程序</h1><div class="setup-section"><div class="input-group"><label for="name-input">请输入你的名字</label><input type="text" id="name-input" class="input-field" placeholder="例如：EVAN"></div></div><div class="setup-section"><div class="tab-nav"><button class="tab-btn active" data-tab="url">从URL加载</button><button class="tab-btn" data-tab="local">上传本地文件</button></div><div id="url-tab" class="tab-content active"><input type="text" id="url-input" class="input-field" placeholder="粘贴 Excel 文件链接"><div class="loader-container"><button id="load-url-btn" class="btn">加载数据</button><button id="review-btn" class="btn btn-red">开始复习</button><p id="loading-status-url" class="loading-status-inline"></p></div></div><div id="local-tab" class="tab-content"><div class="loader-container"><button id="upload-btn" class="btn">选择文件</button><p id="loading-status-local" class="loading-status-inline"></p></div><input type="file" id="file-input" accept=".xls,.xlsx"></div><div id="sheet-selector" style="display:none; margin-top:15px;"><label for="sheet-select">检测到多个工作表，请选择:</label><select id="sheet-select" class="input-field"></select></div><a id="template-link" href="#" download="单词学习模板.xlsx">下载Excel模板</a></div>
+        <div id="setup-view" class="view active"><h1>单词学习与测试程序2.0</h1><div class="setup-section"><div class="input-group"><label for="name-input">请输入你的名字</label><input type="text" id="name-input" class="input-field" placeholder="例如：EVAN"></div></div><div class="setup-section"><div class="tab-nav"><button class="tab-btn active" data-tab="url">从URL加载</button><button class="tab-btn" data-tab="local">上传本地文件</button></div><div id="url-tab" class="tab-content active"><input type="text" id="url-input" class="input-field" placeholder="粘贴 Excel 文件链接"><div class="loader-container"><button id="load-url-btn" class="btn">加载数据</button><button id="review-btn" class="btn btn-red">开始复习</button><p id="loading-status-url" class="loading-status-inline"></p></div></div><div id="local-tab" class="tab-content"><div class="loader-container"><button id="upload-btn" class="btn">选择文件</button><p id="loading-status-local" class="loading-status-inline"></p></div><input type="file" id="file-input" accept=".xls,.xlsx"></div><div id="sheet-selector" style="display:none; margin-top:15px;"><label for="sheet-select">检测到多个工作表，请选择:</label><select id="sheet-select" class="input-field"></select></div><a id="template-link" href="#" download="单词学习模板.xlsx">下载Excel模板</a></div>
         <div id="voice-settings" class="setup-section"><p>语音引擎设置</p><select id="voice-select" class="input-field"></select><p id="tts-status"></p></div>
         <div id="mode-selection-controls" class="setup-section"><h3 id="welcome-message" style="text-align: center;"></h3><div class="button-group"><button class="btn mode-btn" data-mode="test">测试模式</button><button class="btn mode-btn" data-mode="phonics">自然拼读</button><button class="btn mode-btn" data-mode="beginner">初学者</button></div><div id="delay-settings" style="display:none;"><div class="delay-setting-group"><label for="delay-input">延时自动播放 (秒, 0为手动)</label><input type="number" id="delay-input" class="input-field" step="0.1" min="0"></div></div><div class="button-group"><button id="start-btn" class="btn btn-green">开始学习</button></div></div></div>
         <div id="review-options-view" class="view"><h2>选择复习范围</h2><div class="button-group" style="flex-direction: column;"><button class="btn review-range-btn" data-days="0">复习今天</button><button class="btn review-range-btn" data-days="3">复习近3天</button><button class="btn review-range-btn" data-days="7">复习近7天</button><button class="btn review-range-btn" data-days="all">复习全部</button><button id="back-to-setup-from-review" class="btn btn-outline">返回</button></div></div>
-        <div id="study-view" class="view"><div class="main-content"><div id="progress-indicator"></div><div class="word-display" id="word-display-area"><div class="english" id="word-english"></div><div class="phonetic" id="word-phonetic"></div></div><div class="toggle-buttons" id="toggle-buttons-panel"><button class="toggle-btn btn btn-outline" data-target="info-chinese">中文</button><button class="toggle-btn btn btn-outline" data-target="info-sentence">原句</button><button class="toggle-btn btn btn-outline" data-target="info-translation">翻译</button><button class="toggle-btn btn btn-outline" data-target="info-notes">备注</button><button id="toggle-all-btn" class="toggle-btn btn btn-outline">全部显示</button></div><div class="info-panel"><div id="info-chinese" class="info-item"><b>中文意思:</b> <span id="word-chinese-content"></span></div><div id="info-sentence" class="info-item"><b>绘本原句:</b> <span id="word-sentence-content"></span></div><div id="info-translation" class="info-item"><b>句子翻译:</b> <span id="word-translation-content"></span></div><div id="info-notes" class="info-item"><b>备注:</b> <span id="word-notes-content"></span></div></div><div class="study-actions-desktop"><div id="desktop-actions-placeholder"></div><div class="nav-buttons" style="margin-top: 10px;"><button id="prev-word-btn-desktop" class="btn btn-outline">上一个</button><button id="exit-session-btn-desktop" class="btn btn-outline">退出</button></div></div></div><div class="bottom-bar"><div id="mobile-actions-placeholder"></div><div class="nav-buttons"><button id="prev-word-btn-mobile" class="btn btn-outline">上一个</button><button id="exit-session-btn-mobile" class="btn btn-outline">退出</button></div></div></div>
+        <div id="study-view" class="view"><div class="main-content"><div id="progress-indicator"></div><div class="word-display" id="word-display-area" title="点击发音并复制"><div class="english" id="word-english"></div><div class="phonetic" id="word-phonetic"></div></div><div class="toggle-buttons" id="toggle-buttons-panel"><button class="toggle-btn btn btn-outline" data-target="info-chinese">中文</button><button class="toggle-btn btn btn-outline" data-target="info-sentence">原句</button><button class="toggle-btn btn btn-outline" data-target="info-translation">翻译</button><button class="toggle-btn btn btn-outline" data-target="info-notes">备注</button><button id="toggle-all-btn" class="toggle-btn btn btn-outline">全部显示</button></div><div class="info-panel"><div id="info-chinese" class="info-item"><b>中文意思:</b> <span id="word-chinese-content"></span></div><div id="info-sentence" class="info-item"><b>绘本原句:</b> <span id="word-sentence-content"></span></div><div id="info-translation" class="info-item"><b>句子翻译:</b> <span id="word-translation-content"></span></div><div id="info-notes" class="info-item"><b>备注:</b> <span id="word-notes-content"></span></div></div><div class="study-actions-desktop"><div id="desktop-actions-placeholder"></div><div class="nav-buttons" style="margin-top: 10px;"><button id="prev-word-btn-desktop" class="btn btn-outline">上一个</button><button id="exit-session-btn-desktop" class="btn btn-outline">退出</button></div></div></div><div class="bottom-bar"><div id="mobile-actions-placeholder"></div><div class="nav-buttons"><button id="prev-word-btn-mobile" class="btn btn-outline">上一个</button><button id="exit-session-btn-mobile" class="btn btn-outline">退出</button></div></div></div>
         <div id="results-view" class="view"><div class="main-content"><h2 id="results-title">太棒了!</h2><p id="results-summary" class="results-summary"></p><div id="error-container"></div><div class="button-group"><button id="export-errors-btn" class="btn">导出错题</button><button id="return-home-from-results-btn" class="btn btn-outline">返回首页</button></div></div></div>
         <template id="actions-template"></template>`;
         
@@ -181,12 +208,19 @@
     document.addEventListener('DOMContentLoaded', () => {
         const state = { userName: '', workbook: null, allWords: [], studyList: [], mainSessionErrors: [], currentWordIndex: 0, currentMode: null, sessionSubErrors: [], isCategorizedReview: false, delaySettings: { test: 1.5, phonics: 1.5 }, ttsVoice: null, isTTSReady: false, allVoices: [], autoPlayTimeout: null, corsProxy: 'https://api.allorigins.win/raw?url=' };
         const views = { setup: document.getElementById('setup-view'), reviewOptions: document.getElementById('review-options-view'), study: document.getElementById('study-view'), results: document.getElementById('results-view'), };
-        const elements = { nameInput: document.getElementById('name-input'), urlInput: document.getElementById('url-input'), fileInput: document.getElementById('file-input'), loadUrlBtn: document.getElementById('load-url-btn'), uploadBtn: document.getElementById('upload-btn'), sheetSelector: document.getElementById('sheet-selector'), sheetSelect: document.getElementById('sheet-select'), loadingStatusUrl: document.getElementById('loading-status-url'), loadingStatusLocal: document.getElementById('loading-status-local'), voiceSettings: document.getElementById('voice-settings'), voiceSelect: document.getElementById('voice-select'), ttsStatus: document.getElementById('tts-status'), templateLink: document.getElementById('template-link'), modeSelectionControls: document.getElementById('mode-selection-controls'), welcomeMessage: document.getElementById('welcome-message'), startBtn: document.getElementById('start-btn'), reviewBtn: document.getElementById('review-btn'), delaySettings: document.getElementById('delay-settings'), delayInput: document.getElementById('delay-input'), progressIndicator: document.getElementById('progress-indicator'), wordEnglish: document.getElementById('word-english'), wordPhonetic: document.getElementById('word-phonetic'), wordChinese: document.getElementById('word-chinese-content'), wordSentence: document.getElementById('word-sentence-content'), wordTranslation: document.getElementById('word-translation-content'), wordNotes: document.getElementById('word-notes-content'), infoItems: document.querySelectorAll('.info-item'), toggleButtonsPanel: document.getElementById('toggle-buttons-panel'), wordDisplayArea: document.getElementById('word-display-area'), resultsTitle: document.getElementById('results-title'), resultsSummary: document.getElementById('results-summary'), errorContainer: document.getElementById('error-container'), exportErrorsBtn: document.getElementById('export-errors-btn'), desktopActionsPlaceholder: document.getElementById('desktop-actions-placeholder'), mobileActionsPlaceholder: document.getElementById('mobile-actions-placeholder'), actionsTemplate: document.getElementById('actions-template'), };
+        const elements = { nameInput: document.getElementById('name-input'), urlInput: document.getElementById('url-input'), fileInput: document.getElementById('file-input'), loadUrlBtn: document.getElementById('load-url-btn'), uploadBtn: document.getElementById('upload-btn'), sheetSelector: document.getElementById('sheet-selector'), sheetSelect: document.getElementById('sheet-select'), loadingStatusUrl: document.getElementById('loading-status-url'), loadingStatusLocal: document.getElementById('loading-status-local'), voiceSettings: document.getElementById('voice-settings'), voiceSelect: document.getElementById('voice-select'), ttsStatus: document.getElementById('tts-status'), templateLink: document.getElementById('template-link'), modeSelectionControls: document.getElementById('mode-selection-controls'), welcomeMessage: document.getElementById('welcome-message'), startBtn: document.getElementById('start-btn'), reviewBtn: document.getElementById('review-btn'), delaySettings: document.getElementById('delay-settings'), delayInput: document.getElementById('delay-input'), progressIndicator: document.getElementById('progress-indicator'), wordEnglish: document.getElementById('word-english'), wordPhonetic: document.getElementById('word-phonetic'), wordChinese: document.getElementById('word-chinese-content'), wordSentence: document.getElementById('word-sentence-content'), wordTranslation: document.getElementById('word-translation-content'), wordNotes: document.getElementById('word-notes-content'), infoItems: document.querySelectorAll('.info-item'), toggleButtonsPanel: document.getElementById('toggle-buttons-panel'), wordDisplayArea: document.getElementById('word-display-area'), resultsTitle: document.getElementById('results-title'), resultsSummary: document.getElementById('results-summary'), errorContainer: document.getElementById('error-container'), exportErrorsBtn: document.getElementById('export-errors-btn'), desktopActionsPlaceholder: document.getElementById('desktop-actions-placeholder'), mobileActionsPlaceholder: document.getElementById('mobile-actions-placeholder'), actionsTemplate: document.getElementById('actions-template'), toast: document.getElementById('toast-notification') };
         
         function switchView(viewName) { Object.values(views).forEach(v => v.classList.remove('active')); views[viewName].classList.add('active'); }
-        function saveData() { localStorage.setItem('wordLearner_userName', state.userName); localStorage.setItem('wordLearner_delaySettings', JSON.stringify(state.delaySettings)); localStorage.setItem('wordLearner_voiceURI', state.ttsVoice ? state.ttsVoice.voiceURI : ''); }
+        function saveData() { localStorage.setItem('wordLearner_userName', state.userName); localStorage.setItem('wordLearner_delaySettings', JSON.stringify(state.delaySettings)); if(state.ttsVoice) localStorage.setItem('wordLearner_voiceURI', state.ttsVoice.voiceURI); }
         function loadData() { state.userName = localStorage.getItem('wordLearner_userName') || ''; elements.nameInput.value = state.userName; const s = localStorage.getItem('wordLearner_delaySettings'); if (s) state.delaySettings = JSON.parse(s); }
         
+        // 显示复制成功提示
+        function showToast(message) {
+            elements.toast.textContent = message;
+            elements.toast.classList.add("show");
+            setTimeout(function(){ elements.toast.classList.remove("show"); }, 2000);
+        }
+
         function initTTS() {
             if (!('speechSynthesis' in window)) { elements.ttsStatus.textContent = '语音功能不受支持'; return; }
             elements.ttsStatus.textContent = '语音引擎加载中...';
@@ -205,6 +239,7 @@
                     elements.voiceSelect.appendChild(option);
                 });
 
+                // 优先加载用户之前选择的语音
                 const savedURI = localStorage.getItem('wordLearner_voiceURI');
                 let selectedVoice = voices.find(v => v.voiceURI === savedURI);
 
@@ -212,9 +247,11 @@
                     const findVoice = (keywords) => voices.find(v => keywords.some(k => v.name.toLowerCase().includes(k.toLowerCase())));
                     const priorities = [
                         () => voices.find(v => v.default),
+                        // iOS 特别优化：Samantha 是 iOS 内置最好的自然女声，Daniel 是男声
+                        () => findVoice(['samantha']),
+                        () => findVoice(['daniel']),
                         () => findVoice(['enhanced', 'premium', '优化', '优质']),
                         () => findVoice(['natural', 'ava']),
-                        () => findVoice(['microsoft', 'online']),
                         () => findVoice(['google']),
                         () => voices.find(v => v.lang.startsWith('en-US') && v.localService),
                     ];
@@ -233,7 +270,7 @@
                 return true;
             };
 
-            speechSynthesis.speak(new SpeechSynthesisUtterance(' '));
+            speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); // 触发某些浏览器加载语音
             if (speechSynthesis.onvoiceschanged !== undefined) {
                 speechSynthesis.onvoiceschanged = populateVoiceList;
             }
@@ -244,7 +281,7 @@
                     if (populateVoiceList() || elapsed >= 5000) {
                         clearInterval(pollInterval);
                         if (!state.isTTSReady) {
-                            elements.ttsStatus.textContent = '语音引擎加载失败';
+                            elements.ttsStatus.textContent = '语音列表未加载，点击开始后将再次尝试。';
                         }
                     }
                 }, 500);
@@ -255,12 +292,31 @@
             const selectedURI = e.target.value;
             state.ttsVoice = state.allVoices.find(v => v.voiceURI === selectedURI);
             elements.ttsStatus.textContent = `当前语音: ${state.ttsVoice.name}`;
-            saveData();
-            speak("Hello");
+            saveData(); // 立即保存选择
+            speak("Hello, is this voice better?");
         });
         
-        function activateMobileAudio() { if (speechSynthesis.speaking) return; const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); }
-        function speak(text) { if (!text) return; if (!state.isTTSReady || !state.ttsVoice) { console.error("TTS未就绪, 无法发音。"); return; } speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.voice = state.ttsVoice; u.rate = 1.0; u.pitch = 1.0; speechSynthesis.speak(u); }
+        function activateMobileAudio() { 
+            // 确保在用户交互时重新尝试加载语音（针对iOS Safari）
+            if(!state.isTTSReady) initTTS();
+            if (speechSynthesis.speaking) return; 
+            const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); 
+        }
+        
+        function speak(text) { 
+            if (!text) return; 
+            if (!state.isTTSReady || !state.ttsVoice) { 
+                // 尝试最后的补救
+                initTTS();
+                if(!state.ttsVoice) { console.error("TTS未就绪, 无法发音。"); return; }
+            } 
+            speechSynthesis.cancel(); 
+            const u = new SpeechSynthesisUtterance(text); 
+            u.voice = state.ttsVoice; 
+            u.rate = 1.0; 
+            u.pitch = 1.0; 
+            speechSynthesis.speak(u); 
+        }
         
         function setStatus(message, type = 'url') {
             const target = type === 'url' ? elements.loadingStatusUrl : elements.loadingStatusLocal;
@@ -287,12 +343,9 @@
             if (!state.isTTSReady) initTTS();
         }
         
-        // --- 核心修改部分 START ---
         async function handleUrlLoad() { 
             const url = elements.urlInput.value.trim(); 
             if (!url) { alert('请输入URL'); return; } 
-            
-            // 尝试直接加载 (优先策略，解决国内访问代理慢的问题)
             setStatus('正在尝试直接连接...', 'url'); 
             try { 
                 const r = await fetch(url); 
@@ -301,7 +354,6 @@
                 parseExcel(d, 'url'); 
             } catch (e1) { 
                 console.warn('直接加载失败，尝试代理:', e1);
-                // 尝试代理加载 (备用策略)
                 setStatus('直接连接失败，尝试通过代理...', 'url'); 
                 try { 
                     const r = await fetch(state.corsProxy + encodeURIComponent(url)); 
@@ -314,7 +366,6 @@
                 } 
             } 
         }
-        // --- 核心修改部分 END ---
 
         function handleFileUpload(e) { const f = e.target.files[0]; if (f) { setStatus(f.name, 'local'); const r = new FileReader(); r.onload = (ev) => parseExcel(ev.target.result, 'local'); r.readAsArrayBuffer(f); } }
         
@@ -489,7 +540,38 @@
             else if (target.classList.contains('toggle-btn')) { document.getElementById(target.dataset.target).classList.toggle('visible'); }
         });
 
-        elements.wordDisplayArea.addEventListener('click', () => { speak(state.studyList[state.currentWordIndex]?.english); });
+        // 单词显示区域点击事件：发音 + 复制
+        elements.wordDisplayArea.addEventListener('click', () => {
+            const word = state.studyList[state.currentWordIndex]?.english;
+            if (!word) return;
+
+            // 1. 发音
+            speak(word);
+
+            // 2. 复制到剪贴板
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(word)
+                    .then(() => showToast(`已复制: ${word}`))
+                    .catch(err => console.error('复制失败', err));
+            } else {
+                // 兼容旧浏览器
+                const textArea = document.createElement("textarea");
+                textArea.value = word;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(`已复制: ${word}`);
+                } catch (err) {
+                    console.error('复制失败', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        });
+
         elements.errorContainer.addEventListener('click', (e) => {
             if (e.target.classList.contains('review-error-group-btn')) {
                 const errorType = e.target.dataset.errorType;
